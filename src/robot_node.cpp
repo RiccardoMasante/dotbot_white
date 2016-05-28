@@ -1,17 +1,18 @@
 #include "ros/ros.h"
 
+#include "robot_white/get_moves_srv.h"
 #include "std_msgs/UInt8.h"
 #include "std_msgs/Empty.h"
 #include "std_msgs/String.h"
 //#include "dotbot_msgs"
 #include <sstream>
 
-// ============= Attacco.hpp ================
+// ============= Attack.hpp ================
 
-class Attacco{
+class Attack{
 	private:
 		const std::string _name;
-		const int _danno;
+		const int _damage;
 		const int _atk_modifier;
 		const int _def_modifier;
 		const bool _priority;
@@ -19,18 +20,17 @@ class Attacco{
 		const int _cure;
  	
 	public:
-		Attacco(std::string name , int danno , int atk_modifier , int def_modifier,
+		Attack(std::string name , int damage , int atk_modifier , int def_modifier,
 		 bool priority , std::string type , int cure);
-  		~Attacco();
+  		~Attack();
 		
-		//TODO ricevi colpo
-		std::string get_name() const;
-		int get_danno() const;
-		int get_atk_mod() const;
-		int get_def_mod() const;
-		bool get_priority() const;
-		std::string get_type() const;
-		int get_cure() const;
+		std::string getName() const;
+		int getDamage() const;
+		int getAtkMod() const;
+		int getDefMod() const;
+		bool getPriority() const;
+		std::string getType() const;
+		int getCure() const;
 	
 };
 
@@ -38,6 +38,7 @@ class Attacco{
 // ============= Robot.hpp ================
 class Robot{
 	private:
+
   		ros::NodeHandle _nh;
 		
 		int _health_points;
@@ -45,8 +46,8 @@ class Robot{
 		int _defense_points;
 		const int _speed_points;
 		const std::string _type;
-		Attacco * _attacco[4];  // array da 0 a 3
-		int _attacco_da_sferrare; //valore da 1 a 4
+		Attack * _attack[4];  // array da 0 a 3
+		int _attack_to_launch; //valore da 1 a 4
 		bool _newturn_flag;
 	
 		ros::Publisher hp_pub;
@@ -54,38 +55,41 @@ class Robot{
 		ros::Subscriber newturn_sub;
 		ros::Subscriber get_move_sub;
 		ros::Publisher myspeed_pub;
-		
-		void new_turn(const std_msgs::Empty & msg);
-		void get_move(const std_msgs::UInt8 & numero_mossa);
-		void send_log_msg(std::string testo_messaggio, int valore);
+		ros::ServiceServer moves_srv;
+
+		void newTurn(const std_msgs::Empty & msg);
+		void getMove(const std_msgs::UInt8 & move_number);
+		void sendLogMsg(std::string testo_messaggio, int valore);
+		bool movesNamesCb(robot_white::get_moves_srv::Request &req,
+			robot_white::get_moves_srv::Response &res);
  	
 	public:
   		Robot();
   		~Robot();
   		void run();
 
-  		int get_hp() const;
-  		void set_hp(int);
-  		void inc_hp(int);
+  		int getHp() const;
+  		void setHp(int);
+  		void incHp(int);
 
-		int get_ap() const;
-		void set_ap(int);
-		void inc_ap(int);
+		int getAp() const;
+		void setAp(int);
+		void incAp(int);
 
-		int get_dp() const;
-		void set_dp(int);
-		void inc_dp(int);
+		int getDp() const;
+		void setDp(int);
+		void incDp(int);
 
-		int get_speed() const;
+		int getSpeed() const;
 
-		std::string get_type() const;
+		std::string getType() const;
 		
-		bool get_newturn_flag() const;
-		void set_newturn_flag(bool);
+		bool getNewturnFlag() const;
+		void setNewturnFlag(bool);
 
-		Attacco * get_attacco(int numero_attacco) const; //numero_attacco va da 1 a 4
-		int get_attacco_da_sferrare() const;
-		void set_attacco_da_sferrare(int ); //prende intero da 1 a 4, oppure un numero negativo se non ci sono mosse...
+		Attack * getAttack(int attack_number) const; //attack_number va da 1 a 4
+		int getAttackToLaunch() const;
+		void setAttackToLaunch(int ); //prende intero da 1 a 4, oppure un numero negativo se non ci sono mosse...
 
 };
 
@@ -95,30 +99,32 @@ class Robot{
 
 Robot::Robot() : _type("fire"), _speed_points(20)
 {
-	this->set_ap(20);
-	this->set_dp(20);
+	this->setAp(20);
+	this->setDp(20);
 
-	this->_attacco[0]=new Attacco("Fuoco Bomba" , 20 , 3 , 0 , false , "fire" , 0);
-	this->_attacco[1]=new Attacco("Giga-Assorbimento" , 15 , 0 , 3 , false , "water" , 15);
-	this->_attacco[2]=new Attacco("Terremoto" , 25 , 0 , 0 , false , "grass" , 0);
-	this->_attacco[3]=new Attacco("Pugno Rapido" , 15 , 5 , -2 , true , "fire" , 0);
+	this->_attack[0]=new Attack("Fuoco Bomba" , 20 , 3 , 0 , false , "fire" , 0);
+	this->_attack[1]=new Attack("Giga-Assorbimento" , 15 , 0 , 3 , false , "water" , 15);
+	this->_attack[2]=new Attack("Terremoto" , 25 , 0 , 0 , false , "grass" , 0);
+	this->_attack[3]=new Attack("Pugno Rapido" , 15 , 5 , -2 , true , "fire" , 0);
 
-	this->set_attacco_da_sferrare(-1);
+	this->setAttackToLaunch(-1);
 
 	this->log_pub =this->_nh.advertise<std_msgs::String>("log",1000);
 	
 	this->hp_pub = this->_nh.advertise<std_msgs::UInt8>("hp", 1000);
-	this->set_hp(100);
+	this->setHp(100);
 
 
-	this->newturn_sub=this->_nh.subscribe("/newturn",1000, &Robot::new_turn,this);
-	this->set_newturn_flag(false);
+	this->newturn_sub=this->_nh.subscribe("/newturn",1000, &Robot::newTurn,this);
+	this->setNewturnFlag(false);
 
-	this->get_move_sub=this->_nh.subscribe("move",1000, &Robot::get_move,this);
+	this->get_move_sub=this->_nh.subscribe("move",1000, &Robot::getMove,this);
 	
 	this->myspeed_pub = this->_nh.advertise<std_msgs::UInt8>("speed",1000);
 
-	this->set_newturn_flag(false);
+	this->moves_srv = this->_nh.advertiseService("get_moves_srv",&Robot::movesNamesCb,this);
+
+	this->setNewturnFlag(false);
 	
 }
 
@@ -128,14 +134,15 @@ Robot::~Robot() {
 
 
 void Robot::run() {
+
 	ros::Rate loop_rate(1);
-	while (ros::ok() && get_hp() > 0) {
+	while (ros::ok() && getHp() > 0) {
 		ros::spinOnce();
 		loop_rate.sleep();
 	}
 }
 
-void Robot::send_log_msg (std::string testo_messaggio, int valore) {
+void Robot::sendLogMsg (std::string testo_messaggio, int valore) {
 	std_msgs::String log_msg;
 	std::stringstream ss;
 	ss << testo_messaggio << valore;
@@ -143,124 +150,131 @@ void Robot::send_log_msg (std::string testo_messaggio, int valore) {
 	this->log_pub.publish(log_msg);
 }
 	
-int Robot::get_hp() const
+int Robot::getHp() const
 { 
 	return this->_health_points;
 }
 
-void Robot::set_hp(int hp) {
+void Robot::setHp(int hp) {
   	this->_health_points = hp;
 	std_msgs::UInt8 hp_msg;
- 	hp_msg.data = get_hp();
+ 	hp_msg.data = getHp();
   	this->hp_pub.publish(hp_msg);
 
-	this->send_log_msg( "Aggiornati i punti vita a ", get_hp());
+	this->sendLogMsg( "Aggiornati i punti vita a ", getHp());
 }
 
-void Robot::inc_hp(int increment) {
-  	this->set_hp(this->get_hp() + increment);
+void Robot::incHp(int increment) {
+  	this->setHp(this->getHp() + increment);
 }
 
 
-int Robot::get_ap() const
+int Robot::getAp() const
 {
 	return this->_attack_points;
 }
 
-void Robot::set_ap(int ap) {
+void Robot::setAp(int ap) {
 	this->_attack_points = ap;
 }
 
-void Robot::inc_ap(int increment) {
-  	this->set_ap(this->get_ap() + increment);
+void Robot::incAp(int increment) {
+  	this->setAp(this->getAp() + increment);
 }
 
-int Robot::get_dp() const
+int Robot::getDp() const
 {
 	return this->_defense_points;
 }
 
-void Robot::set_dp(int dp) {
+void Robot::setDp(int dp) {
 	this->_defense_points = dp;
 }
 
-void Robot::inc_dp(int increment) {
-  	this->set_dp(this->get_dp() + increment);
+void Robot::incDp(int increment) {
+  	this->setDp(this->getDp() + increment);
 }
 
-int Robot::get_speed() const
+int Robot::getSpeed() const
 {
 	return this->_speed_points;
 }
 
-std::string Robot::get_type() const
+std::string Robot::getType() const
 {
 	return this->_type;
 }
 
-Attacco * Robot::get_attacco(int numero_attacco) const
+Attack * Robot::getAttack(int attack_number) const
 {
-	if (numero_attacco > 0 ) {
-		return this->_attacco[numero_attacco-1];
+	if (attack_number > 0 ) {
+		return this->_attack[attack_number-1];
 	} else {
 		return NULL;
 	}
 }
 
-void Robot::set_attacco_da_sferrare(int numero_attacco) 
+void Robot::setAttackToLaunch(int attack_number) 
 {
-	if (numero_attacco <= 4 && numero_attacco >= 1) { 
-		this->_attacco_da_sferrare = numero_attacco;
+	if (attack_number <= 4 && attack_number >= 1) { 
+		this->_attack_to_launch = attack_number;
 	} else {
-		this->_attacco_da_sferrare = -1;
+		this->_attack_to_launch = -1;
 	}
 }
 
-int Robot::get_attacco_da_sferrare() const
+int Robot::getAttackToLaunch() const
 {
-	return this->_attacco_da_sferrare;
+	return this->_attack_to_launch;
 }
 
-bool Robot::get_newturn_flag() const
+bool Robot::getNewturnFlag() const
 {
 	return this->_newturn_flag;
 }
 
-void Robot::set_newturn_flag(bool flag)
+void Robot::setNewturnFlag(bool flag)
 {	
 	this->_newturn_flag = flag;	
 }
 
-void Robot::new_turn(const std_msgs::Empty & msg)
+void Robot::newTurn(const std_msgs::Empty & msg)
 {
-	set_newturn_flag(true);
+	setNewturnFlag(true);
 }
 
-void Robot::get_move(const std_msgs::UInt8 & numero_mossa)
+void Robot::getMove(const std_msgs::UInt8 & move_number)
 {
-	if (this->get_newturn_flag())
+	if (this->getNewturnFlag())
 	{
-		this->set_attacco_da_sferrare(numero_mossa.data);
-		this->set_newturn_flag(false);
+		this->setAttackToLaunch(move_number.data);
+		this->setNewturnFlag(false);
 
 		std_msgs::UInt8 speed_msg;
-		speed_msg.data = this->get_speed() + 100 * (int) get_attacco(get_attacco_da_sferrare())->get_priority();
+		speed_msg.data = this->getSpeed() + 100 * (int) getAttack(getAttackToLaunch())->getPriority();
 		myspeed_pub.publish(speed_msg);
 		
-		send_log_msg("ho scelto il mio attacco e comunicata la mia velocita... ti distruggo!",0);
+		sendLogMsg("ho scelto il mio attack e comunicata la mia velocita... ti distruggo!",0);
 	}	
 
 }
 
+bool Robot::movesNamesCb(robot_white::get_moves_srv::Request &req,
+		robot_white::get_moves_srv::Response &res)
+{
+	res.move1.data = getAttack(1)->getName();
+	res.move2.data = getAttack(2)->getName();
+	res.move3.data = getAttack(3)->getName();
+	res.move4.data = getAttack(4)->getName();
+	return true;
+}
 
+// ============= Attack.cpp ================
 
-
-// ============= Attacco.cpp ================
-
-Attacco::Attacco(std::string name , int danno , int atk_modifier , int def_modifier,
+Attack::Attack(std::string name , int damage , int atk_modifier , int def_modifier,
 		 bool priority , std::string type , int cure) :
 		 _name(name), 
-		 _danno(danno), 
+		 _damage(damage), 
 		 _atk_modifier(atk_modifier), 
 		 _def_modifier(def_modifier),
 		 _priority(priority), 
@@ -271,42 +285,42 @@ Attacco::Attacco(std::string name , int danno , int atk_modifier , int def_modif
 }
 
 
-Attacco::~Attacco() 
+Attack::~Attack() 
 {
 
 }
 
-std::string Attacco::get_name() const
+std::string Attack::getName() const
 {
 	return this->_name;
 }
 
-int Attacco::get_danno() const
+int Attack::getDamage() const
 {
-	return this->_danno;
+	return this->_damage;
 }
 
-int Attacco::get_atk_mod() const
+int Attack::getAtkMod() const
 {
 	return this->_atk_modifier;
 }
 	
-int Attacco::get_def_mod() const
+int Attack::getDefMod() const
 {
 	return this->_def_modifier;
 }
 	
-bool Attacco::get_priority() const
+bool Attack::getPriority() const
 {
 	return this->_priority;
 }
 
-std::string Attacco::get_type() const
+std::string Attack::getType() const
 {
 	return this->_type;
 }
 	
-int Attacco::get_cure() const
+int Attack::getCure() const
 {
 	return this->_cure;
 }
