@@ -35,6 +35,63 @@ class Attack{
 };
 
 
+// ============= Attack.cpp ================
+
+Attack::Attack(std::string name , int damage , int atk_modifier , int def_modifier,
+		 bool priority , std::string type , int cure) :
+		 _name(name), 
+		 _damage(damage), 
+		 _atk_modifier(atk_modifier), 
+		 _def_modifier(def_modifier),
+		 _priority(priority), 
+		 _type(type), 
+		 _cure(cure)
+{
+	//
+}
+
+
+Attack::~Attack() 
+{
+
+}
+
+std::string Attack::getName() const
+{
+	return this->_name;
+}
+
+int Attack::getDamage() const
+{
+	return this->_damage;
+}
+
+int Attack::getAtkMod() const
+{
+	return this->_atk_modifier;
+}
+	
+int Attack::getDefMod() const
+{
+	return this->_def_modifier;
+}
+	
+bool Attack::getPriority() const
+{
+	return this->_priority;
+}
+
+std::string Attack::getType() const
+{
+	return this->_type;
+}
+	
+int Attack::getCure() const
+{
+	return this->_cure;
+}
+
+
 // ============= Robot.hpp ================
 class Robot{
 	private:
@@ -269,61 +326,8 @@ bool Robot::movesNamesCb(robot_white::get_moves_srv::Request &req,
 	return true;
 }
 
-// ============= Attack.cpp ================
 
-Attack::Attack(std::string name , int damage , int atk_modifier , int def_modifier,
-		 bool priority , std::string type , int cure) :
-		 _name(name), 
-		 _damage(damage), 
-		 _atk_modifier(atk_modifier), 
-		 _def_modifier(def_modifier),
-		 _priority(priority), 
-		 _type(type), 
-		 _cure(cure)
-{
-	//
-}
-
-
-Attack::~Attack() 
-{
-
-}
-
-std::string Attack::getName() const
-{
-	return this->_name;
-}
-
-int Attack::getDamage() const
-{
-	return this->_damage;
-}
-
-int Attack::getAtkMod() const
-{
-	return this->_atk_modifier;
-}
-	
-int Attack::getDefMod() const
-{
-	return this->_def_modifier;
-}
-	
-bool Attack::getPriority() const
-{
-	return this->_priority;
-}
-
-std::string Attack::getType() const
-{
-	return this->_type;
-}
-	
-int Attack::getCure() const
-{
-	return this->_cure;
-}
+// ============== main.cpp ================
 
 int main(int argc, char **argv)
 {	
