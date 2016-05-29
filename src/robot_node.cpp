@@ -4,7 +4,7 @@
 #include "std_msgs/UInt8.h"
 #include "std_msgs/Empty.h"
 #include "std_msgs/String.h"
-//#include "dotbot_msgs"
+#include "dotbot_msgs"
 #include <sstream>
 
 // ============= Attack.hpp ================
@@ -113,12 +113,15 @@ class Robot{
 		ros::Subscriber get_move_sub;
 		ros::Publisher myspeed_pub;
 		ros::ServiceServer moves_srv;
+		ros::Subscriber myturn_sub;
+		ros::Publisher atk_pub;
 
 		void newTurn(const std_msgs::Empty & msg);
 		void getMove(const std_msgs::UInt8 & move_number);
 		void sendLogMsg(std::string testo_messaggio, int valore);
 		bool movesNamesCb(robot_white::get_moves_srv::Request &req,
 			robot_white::get_moves_srv::Response &res);
+		int calcoloDanno();
  	
 	public:
   		Robot();
@@ -182,6 +185,9 @@ Robot::Robot() : _type("fire"), _speed_points(20)
 	this->moves_srv = this->_nh.advertiseService("get_moves_srv",&Robot::movesNamesCb,this);
 
 	this->setNewturnFlag(false);
+	
+	this->myturn_sub = this->_nh.subscribe("white_turn",1000, &Robot::attack,this);
+	this->atk_pub = this->_nh.advertise<dotbot_msgs::Attacco>("/silver/danno",1000);
 	
 }
 
@@ -324,6 +330,35 @@ bool Robot::movesNamesCb(robot_white::get_moves_srv::Request &req,
 	res.move3.data = getAttack(3)->getName();
 	res.move4.data = getAttack(4)->getName();
 	return true;
+}
+
+void Robot::attack(const std_msgs::Empty & msg)
+{
+	dotbot_msg::attacco atk_msg;
+	
+	//calcolo danno
+	atk_msg.danno.data=this->calcoloDanno();
+	atk_msg.type.data=this->getAttack(this->getAttackToLaunch())->getType();
+	
+	//comunico atk_msg 
+	this->atk_pub.publish(atk_msg);
+
+	//aggiungere movimenti
+
+	//aggiorno miei valori
+	this->incHp(this->getAttack(this->getAttackToLaunch())->getCure());
+	this->incAp(this->getAttack(this->getAttackToLaunch())->getAtkMod());
+	this->incDp(this->getAttack(this->getAttackToLaunch())->getDefMod());
+	
+	//scrivo nel log	
+	sendLogMsg("ho attaccatoooo",0);
+}
+
+int Robot::calcoloDanno()
+{
+	float a;
+	a=(this->getAttack(this->getAttackToLaunch())->getDanno())*(this->getAp())*RandomFloat(0.8,1.2);
+	return ceil(a);
 }
 
 
