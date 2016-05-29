@@ -335,10 +335,11 @@ bool Robot::movesNamesCb(robot_white::get_moves_srv::Request &req,
 void Robot::attack(const std_msgs::Empty & msg)
 {
 	dotbot_msg::attacco atk_msg;
+	Attacco *attack_tmp=this->getAttack(this->getAttackToLaunch());
 	
 	//calcolo danno
 	atk_msg.danno.data=this->calcoloDanno();
-	atk_msg.type.data=this->getAttack(this->getAttackToLaunch())->getType();
+	atk_msg.type.data=attack_tmp->getType();
 	
 	//comunico atk_msg 
 	this->atk_pub.publish(atk_msg);
@@ -346,9 +347,9 @@ void Robot::attack(const std_msgs::Empty & msg)
 	//aggiungere movimenti
 
 	//aggiorno miei valori
-	this->incHp(this->getAttack(this->getAttackToLaunch())->getCure());
-	this->incAp(this->getAttack(this->getAttackToLaunch())->getAtkMod());
-	this->incDp(this->getAttack(this->getAttackToLaunch())->getDefMod());
+	this->incHp(attack_tmp->getCure());
+	this->incAp(attack_tmp->getAtkMod());
+	this->incDp(attack_tmp->getDefMod());
 	
 	//scrivo nel log	
 	sendLogMsg("ho attaccatoooo",0);
