@@ -6,6 +6,7 @@
 #include "std_msgs/String.h"
 #include "dotbot_msgs"
 #include <sstream>
+#include <cmath>
 
 // ============= Attack.hpp ================
 
@@ -115,6 +116,7 @@ class Robot{
 		ros::ServiceServer moves_srv;
 		ros::Subscriber myturn_sub;
 		ros::Publisher atk_pub;
+		ros::Subscriber def_sub;
 
 		void newTurn(const std_msgs::Empty & msg);
 		void getMove(const std_msgs::UInt8 & move_number);
@@ -122,6 +124,8 @@ class Robot{
 		bool movesNamesCb(robot_white::get_moves_srv::Request &req,
 			robot_white::get_moves_srv::Response &res);
 		int calcoloDanno();
+		void attack(const std_msgs::Empty & msg);
+		void defence(const std_msgs::Attacco & msg);
  	
 	public:
   		Robot();
@@ -188,6 +192,8 @@ Robot::Robot() : _type("fire"), _speed_points(20)
 	
 	this->myturn_sub = this->_nh.subscribe("white_turn",1000, &Robot::attack,this);
 	this->atk_pub = this->_nh.advertise<dotbot_msgs::Attacco>("/silver/danno",1000);
+	//mettersi poi d'accordo con l'altro gruppo i nomi di questi due topic potrebbero essere invertiti
+	this->def_sub = this->_nh.subscribe("/white/danno",1000, &Robot::defence,this);
 	
 }
 
@@ -239,10 +245,16 @@ int Robot::getAp() const
 
 void Robot::setAp(int ap) {
 	this->_attack_points = ap;
+	
+	this->sendLogMsg( "Aggiornati i punti attacco a ", getAp());
 }
 
 void Robot::incAp(int increment) {
-  	this->setAp(this->getAp() + increment);
+	if(this->getAp()*2^(increment)<100)
+  		this->setAp(this->getAp()*2^(increment));
+  	else
+  		this->setAp(100);
+  		
 }
 
 int Robot::getDp() const
@@ -252,10 +264,15 @@ int Robot::getDp() const
 
 void Robot::setDp(int dp) {
 	this->_defense_points = dp;
+	
+	this->sendLogMsg( "Aggiornati i punti difesa a ", getDp());
 }
 
 void Robot::incDp(int increment) {
-  	this->setDp(this->getDp() + increment);
+	if(this->getDp()*2^(increment)<100)
+  		this->setDp(this->getDp()*2^(increment));
+  	else
+  		this->setDp(100);
 }
 
 int Robot::getSpeed() const
@@ -347,12 +364,14 @@ void Robot::attack(const std_msgs::Empty & msg)
 	//aggiungere movimenti
 
 	//aggiorno miei valori
-	this->incHp(attack_tmp->getCure());
+	this->incHp(this->getHp() * attack_tmp->getCure() / 100);
 	this->incAp(attack_tmp->getAtkMod());
 	this->incDp(attack_tmp->getDefMod());
 	
 	//scrivo nel log	
 	sendLogMsg("ho attaccatoooo",0);
+	
+	//eventualmente comunicare che l'attacco è finito... dipende da cosa vuole fare ludovico
 }
 
 int Robot::calcoloDanno()
@@ -360,6 +379,27 @@ int Robot::calcoloDanno()
 	float a;
 	a=(this->getAttack(this->getAttackToLaunch())->getDanno())*(this->getAp())*RandomFloat(0.8,1.2);
 	return ceil(a);
+}
+
+void Robot::defence(const std_msgs::Attacco & msg)
+{
+	//opzionale: aggiungere animazione difensiva
+	
+	//calcola danno effettivo
+	int damage_received = msg.danno.data;
+	std::string type_damage_received = msg.type.data;
+	if (type_damage_received == "fire"  ||  type_damage_received == "normal")
+		damage_received = floor( damage_received / this->getDp() );
+	if (type_damage_received == "water")
+		damage_received = floor( 2 * damage_received / this->getDp() );
+	if (type_damage_received == "grass")
+		damage_received = floor( 0.5 * damage_received / this->getDp() );
+	
+	//comunica al log che ho ricevuto l'attacco
+	this->sendLogMsg("ho ricevuto il tuo attacco... puoi fare di meglio, mi hai tolto solo ", damage_received);
+	
+	//modifica propria vita
+	this->incHp(- damage_received);
 }
 
 
